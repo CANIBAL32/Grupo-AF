@@ -33,6 +33,9 @@ Aplicación Full-Stack para la gestión de reservas de citas médicas en una cl�
 * **Base de Datos:** PostgreSQL (ejecutado vía Docker / Local).
 * **Servidor & Despliegue:** Nginx, PM2, Environment Config (`.env`).
 
+> 📘 **Guía ordenada de Docker, PostgreSQL, PM2, Nginx y diseño de `medicos`:**
+> [`deploy/GUIA_DESPLIEGUE.md`](deploy/GUIA_DESPLIEGUE.md)
+
 ---
 
 ## 📂 Estructura del Repositorio
@@ -52,6 +55,10 @@ TFI-GrupoAF/
 │   ├── package.json
 │   └── tsconfig.json
 ├── deploy/
+│   ├── GUIA_DESPLIEGUE.md      # Guia ordenada: Docker, PM2, Nginx y diseno de medicos
+│   ├── database/
+│   │   ├── docker-compose.yml  # PostgreSQL 16 en Docker
+│   │   └── init.sql            # DDL de referencia del modelo relacional
 │   ├── nginx/
 │   │   ├── clinica.conf        # Bloque server: / -> Angular, /api -> NestJS
 │   │   └── nginx.conf          # Configuracion principal de Nginx
@@ -74,9 +81,18 @@ CREATE DATABASE clinica_medica;
 
 Con Docker:
 ```bash
-docker run -d --name postgres-clinica -p 5433:5432 \
+docker run -d --name postgres-clinica -p 5434:5432 \
   -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=clinica_medica postgres:16
 ```
+
+> **Alternativa recomendada:** usar el `docker-compose.yml` incluido, que agrega
+> un volumen para no perder los datos:
+> ```bash
+> cd deploy/database
+> docker compose up -d
+> ```
+> Ver [`deploy/GUIA_DESPLIEGUE.md`](deploy/GUIA_DESPLIEGUE.md) para el paso a paso
+> completo de Docker, PM2, Nginx y el diseño relacional de `medicos`.
 
 ---
 
@@ -99,7 +115,7 @@ docker run -d --name postgres-clinica -p 5433:5432 \
    | Variable | Descripción | Valor por defecto |
    | :--- | :--- | :--- |
    | `PORT` | Puerto del backend (destino del proxy) | `3000` |
-   | `DB_HOST` / `DB_PORT` | Host y puerto de PostgreSQL | `localhost` / `5433` |
+   | `DB_HOST` / `DB_PORT` | Host y puerto de PostgreSQL | `localhost` / `5434` |
    | `DB_USERNAME` / `DB_PASSWORD` | Credenciales de la base | `postgres` / `postgres` |
    | `DB_DATABASE` | Nombre de la base de datos | `clinica_medica` |
    | `JWT_SECRET` | Clave de firma de los tokens JWT | *(cambiar en producción)* |
@@ -109,6 +125,23 @@ docker run -d --name postgres-clinica -p 5433:5432 \
    npm run start:dev
    ```
    *El backend estará disponible en `http://localhost:3000/api`*
+
+   Al arrancar, el seeder verifica y crea (si no existen) los usuarios de prueba:
+
+   | Rol | Nombre | Email | Contraseña inicial |
+   | :--- | :--- | :--- | :--- |
+   | Administrador | Valentina Ríos | `admin@clinica.com` | `123456` |
+   | Médico | Martín Gómez | `medico@clinica.com` | `123456` |
+   | Médico | Laura Benítez | `laura.benitez@clinica.com` | `123456` |
+   | Médico | Diego Sosa | `diego.sosa@clinica.com` | `123456` |
+   | Paciente | Sofía Martínez | `paciente@clinica.com` | `123456` |
+
+   También crea tres reservas activas de ejemplo para Sofía Martínez, una con cada
+   médico, en fechas futuras dentro del horario de atención.
+
+   La contraseña se guarda hasheada con bcrypt. Podés cambiarla con
+   `SEED_DEFAULT_PASSWORD` o desactivar la creación automática con
+   `SEED_DEFAULT_USERS=false`.
 
 5. Tests:
    ```bash

@@ -8,12 +8,28 @@ export class ReservaService {
   private http = inject(HttpClient);
   private apiUrl = '/api/v1/reservas';
 
-  // Obtener el token del localStorage
+  // Obtener headers con Bearer token
   private getHeaders(): HttpHeaders {
     const token = localStorage.getItem('token') || localStorage.getItem('access_token');
     return new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
+  }
+
+  // Obtiene el rol del usuario actual desde localStorage o payload JWT
+  private getRolActual(): string {
+    const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+    let rol = localStorage.getItem('rol') || localStorage.getItem('role') || 'PACIENTE';
+
+    if (token && token.includes('.')) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        rol = payload.rol || payload.role || rol;
+      } catch (e) {
+        console.error('Error al leer el rol para cancelación:', e);
+      }
+    }
+    return rol.toUpperCase();
   }
 
   // 1. POST /api/v1/reservas
@@ -28,7 +44,13 @@ export class ReservaService {
 
   // 3. PATCH /api/v1/reservas/:id/cancelar
   cancelarReserva(id: number): Observable<Reserva> {
-    return this.http.patch<Reserva>(`${this.apiUrl}/${id}/cancelar`, {}, { headers: this.getHeaders() });
+    const rolUsuario = this.getRolActual();
+    // Se envía el rol actual en el body para que el backend autorice la cancelación de Admin
+    return this.http.patch<Reserva>(
+      `${this.apiUrl}/${id}/cancelar`, 
+      { rolUsuario }, 
+      { headers: this.getHeaders() }
+    );
   }
 
   // 4. GET /api/v1/reservas/medico/:idMedico/agenda?fecha=YYYY-MM-DD
@@ -47,10 +69,10 @@ export class ReservaService {
     );
   }
   
- // 6. GET /api/v1/reservas/medico/:id/proximos
+  // 6. GET /api/v1/reservas/medico/:id/proximos
   getProximosTurnos(idMedico: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/medico/${idMedico}/proximos`, {
       headers: this.getHeaders()
     });
   }
-  }
+}

@@ -12,6 +12,7 @@ import { CreateReservaDto } from './dto/create-reserva.dto.js';
 import { EstadoReserva } from './enums/estado-reserva.enum.js';
 import { Medico } from '../medicos/entities/medico.entity.js';
 import { Usuario } from '../usuarios/entities/usuario.entity.js';
+
 @Injectable()
 export class ReservasService {
   constructor(
@@ -34,7 +35,7 @@ export class ReservasService {
       throw new BadRequestException('No se pueden reservar turnos en fechas u horas pasadas.');
     }
 
-    // Validar franja horaria (8:00 a 16:00 hs)
+    // Validar franja horaria de atención (8:00 a 16:00 hs)
     const hora = fechaTurno.getHours();
     if (hora < 8 || hora >= 16) {
       throw new BadRequestException('El horario de atención es de 8:00 a 16:00 hs.');
@@ -61,7 +62,7 @@ export class ReservasService {
       throw new NotFoundException(`El paciente con ID ${idPaciente} no existe.`);
     }
 
-    // Verificar si el médico ya tiene turno ocupado a esa hora
+    // Verificar si el médico ya tiene un turno ACTIVO a esa misma hora
     const turnoOcupado = await this.reservaRepository.findOne({
       where: {
         idMedico,
@@ -109,7 +110,7 @@ export class ReservasService {
   }
 
   // 3. Cancelar reserva (reglas para Paciente y Administrador)
-  async cancelarReserva(idReserva: number, rolUsuario: string): Promise<Reserva> {
+  async cancelarReserva(idReserva: number, rolUsuario: string = 'PACIENTE'): Promise<Reserva> {
     const reserva = await this.reservaRepository.findOneBy({ id: idReserva });
 
     if (!reserva) {
@@ -118,9 +119,10 @@ export class ReservasService {
 
     const ahora = new Date();
     const fechaTurno = new Date(reserva.fechaHora);
+    const rol = (rolUsuario || 'PACIENTE').toUpperCase();
 
     // REGLA PACIENTE: Solo hasta el día anterior (23:59:59 del día previo)
-    if (rolUsuario === 'PACIENTE') {
+    if (rol === 'PACIENTE') {
       const limitePaciente = new Date(fechaTurno);
       limitePaciente.setDate(limitePaciente.getDate() - 1);
       limitePaciente.setHours(23, 59, 59, 999);
@@ -132,8 +134,8 @@ export class ReservasService {
       }
     }
 
-    // REGLA ADMINISTRADOR: Hasta el momento de inicio de la consulta
-    if (rolUsuario === 'ADMINISTRADOR') {
+    // REGLA ADMINISTRADOR: Hasta el momento exacto de inicio de la consulta
+    if (rol === 'ADMINISTRADOR' || rol === 'ADMIN') {
       if (ahora >= fechaTurno) {
         throw new BadRequestException(
           'No se puede cancelar un turno que ya inició o transcurrió.',
@@ -164,36 +166,39 @@ export class ReservasService {
 
   // 5. Cambiar el estado del turno (ATENDIDO o AUSENTE)
   async cambiarEstadoTurno(idReserva: number, nuevoEstado: EstadoReserva) {
-  const reserva = await this.reservaRepository.findOneBy({ id: idReserva });
+    const reserva = await this.reservaRepository.findOneBy({ id: idReserva });
 
-  if (!reserva) {
-    throw new NotFoundException('La reserva no existe.');
+    if (!reserva) {
+      throw new NotFoundException('La reserva no existe.');
+    }
+
+    // Validar que no se atienda un turno con fecha futura
+    if (
+      (nuevoEstado === EstadoReserva.ATENDIDO || nuevoEstado === EstadoReserva.AUSENTE) && 
+      new Date(reserva.fechaHora) > new Date()
+    ) {
+      throw new BadRequestException('No se puede registrar la asistencia/ausencia de un turno con fecha futura.');
+    }
+
+    reserva.estado = nuevoEstado;
+    return await this.reservaRepository.save(reserva);
   }
-
-  // Validar que no se atienda un turno con fecha futura
-  if ((nuevoEstado === EstadoReserva.ATENDIDO || nuevoEstado === EstadoReserva.AUSENTE) && new Date(reserva.fechaHora) > new Date()) {
-  throw new BadRequestException('No se puede registrar la asistencia/ausencia de un turno con fecha futura.');
-}
-
-  reserva.estado = nuevoEstado;
-  return await this.reservaRepository.save(reserva);
-}
 
   // 6. Obtener próximos turnos
   async obtenerProximosTurnos(idMedico: number) {
-  const ahora = new Date();
+    const ahora = new Date();
 
-  return await this.reservaRepository.find({
-    where: {
-      idMedico: idMedico,
-      fechaHora: MoreThanOrEqual(ahora),
-      estado: EstadoReserva.ACTIVO,
-    },
-    relations: { paciente: true, },
-    order: {
-      fechaHora: 'ASC',
-    },
-    take: 10,
-  });
-}
+    return await this.reservaRepository.find({
+      where: {
+        idMedico: idMedico,
+        fechaHora: MoreThanOrEqual(ahora),
+        estado: EstadoReserva.ACTIVO,
+      },
+      relations: { paciente: true },
+      order: {
+        fechaHora: 'ASC',
+      },
+      take: 10,
+    });
+  }
 }

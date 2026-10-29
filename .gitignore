@@ -36,3 +36,6 @@ documentation/
 Thumbs.db
 .vscode/
 .idea/
+
+# 7. Archivos generados por Docker Desktop Compose Bridge (Kubernetes)
+deploy/database/bridge/

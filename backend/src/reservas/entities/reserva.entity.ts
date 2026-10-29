@@ -3,13 +3,16 @@ import {
   PrimaryGeneratedColumn, 
   Column, 
   ManyToOne, 
-  JoinColumn 
+  JoinColumn,
+  Index
 } from 'typeorm';
 import { EstadoReserva } from '../enums/estado-reserva.enum.js';
 import { Medico } from '../../medicos/entities/medico.entity.js';
 import { Usuario } from '../../usuarios/entities/usuario.entity.js';
 
 @Entity('reservas')
+@Index('idx_reservas_medico_fecha', ['idMedico', 'fechaHora'])
+@Index('idx_reservas_paciente', ['idPaciente'])
 export class Reserva {
   @PrimaryGeneratedColumn()
   id: number;
@@ -34,6 +37,7 @@ export class Reserva {
   @Column({ 
     type: 'enum', 
     enum: EstadoReserva, 
+    enumName: 'estados_reservas',
     default: EstadoReserva.ACTIVO 
   })
   estado: EstadoReserva;

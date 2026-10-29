@@ -7,10 +7,11 @@
     </div>
     <div class="card-body p-4">
 
-      <!-- Alertas de estado -->
-      <div *ngIf="mensajeExito" class="alert alert-success d-flex align-items-center">
+      <!-- Alertas de estado mutuamente excluyentes -->
+      <div *ngIf="mensajeExito && !mensajeError" class="alert alert-success d-flex align-items-center">
         <i class="bi bi-check-circle-fill me-2"></i>{{ mensajeExito }}
       </div>
+      
       <div *ngIf="mensajeError" class="alert alert-danger d-flex align-items-center">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ mensajeError }}
       </div>

@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ReservaService } from '../../../services/reserva.service';
+import { AuthService } from '../../../services/auth.service';
 
 export interface Reserva {
   id: number;
@@ -21,7 +22,8 @@ export interface Reserva {
 })
 export class MisReservas implements OnInit {
   protected reservaService = inject(ReservaService);
-  protected router = inject(Router);
+  protected authService = inject(AuthService);
+  public router = inject(Router);
 
   reservas: Reserva[] = [];
   cargando: boolean = true;
@@ -30,6 +32,38 @@ export class MisReservas implements OnInit {
 
   ngOnInit(): void {
     this.cargarReservas();
+  }
+
+  // Getter dinámico: evalúa en tiempo real los roles sin desfasarse
+  get esAdmin(): boolean {
+    // 1. Verificación por AuthService
+    const rolService = this.authService.getRole?.();
+    if (rolService && (rolService.toUpperCase() === 'ADMINISTRADOR' || rolService.toUpperCase() === 'ADMIN')) {
+      return true;
+    }
+
+    // 2. Verificación por clave directa en localStorage
+    const rolStorage = localStorage.getItem('rol') || localStorage.getItem('role');
+    if (rolStorage && (rolStorage.toUpperCase() === 'ADMINISTRADOR' || rolStorage.toUpperCase() === 'ADMIN')) {
+      return true;
+    }
+
+    // 3. Decodificación directa del payload del token JWT
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      if (token && token.includes('.')) {
+        const partes = token.split('.');
+        if (partes.length >= 2) {
+          const payload = JSON.parse(atob(partes[1]));
+          const rolToken = (payload.rol || payload.role || '').toUpperCase();
+          return rolToken === 'ADMINISTRADOR' || rolToken === 'ADMIN';
+        }
+      }
+    } catch (e) {
+      console.error('Error al decodificar token en esAdmin:', e);
+    }
+
+    return false;
   }
 
   cargarReservas(): void {
@@ -71,31 +105,32 @@ export class MisReservas implements OnInit {
     });
   }
 
-  // Getters para clasificar reservas activas e históricas
-  get reservasActivas(): Reserva[] {
-    const ahora = new Date();
-    return this.reservas.filter(r => 
-      r.estado === 'ACTIVO' && new Date(r.fechaHora) >= ahora
-    );
-  }
-
-  get reservasHistoricas(): Reserva[] {
-    const ahora = new Date();
-    return this.reservas.filter(r => 
-      r.estado !== 'ACTIVO' || new Date(r.fechaHora) < ahora
-    );
-  }
-
-    puedeCancelarPaciente(fechaHoraStr: string | Date): boolean {
+  // Regla horaria de cancelación según el rol
+  puedeCancelar(fechaHoraStr: string | Date): boolean {
     if (!fechaHoraStr) return false;
 
-    const fechaTurno = new Date(fechaHoraStr);
-    const hoy = new Date();
+    const fechaNormalizada = typeof fechaHoraStr === 'string' 
+      ? fechaHoraStr.replace(' ', 'T') 
+      : fechaHoraStr;
 
+    const fechaTurno = new Date(fechaNormalizada);
+    const ahora = new Date();
+
+    // El Administrador puede cancelar hasta el inicio de la consulta
+    if (this.esAdmin) {
+      return fechaTurno.getTime() > ahora.getTime();
+    }
+
+    // El Paciente solo puede cancelar hasta el día anterior
     const inicioTurno = new Date(fechaTurno.getFullYear(), fechaTurno.getMonth(), fechaTurno.getDate());
-    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
 
     return inicioTurno > inicioHoy;
+  }
+
+  // Alias para mantener compatibilidad con el template HTML
+  puedeCancelarPaciente(fechaHoraStr: string | Date): boolean {
+    return this.puedeCancelar(fechaHoraStr);
   }
 
   cancelarReserva(idReserva: number): void {

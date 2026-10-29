@@ -7,7 +7,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Medico } from '../medicos/entities/medico.entity';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
-import { EstadosUsuario, RolesUsuario } from '../enums/roles.enum';
+import { EstadosUsuario } from '../enums/roles.enum';
 
 @Injectable()
 export class AuthService {
@@ -24,23 +24,10 @@ export class AuthService {
     const clave = loginDto.clave || (loginDto as any).password || '';
 
     // 1. Buscamos el usuario de forma limpia (sin leftJoinAndSelect)
-    let usuario = await this.usuarioRepository
+    const usuario = await this.usuarioRepository
       .createQueryBuilder('u')
       .where('LOWER(TRIM(u.email)) = :email', { email })
       .getOne();
-
-    if (!usuario && email === 'admin@clinica.com') {
-      const nuevoAdmin = this.usuarioRepository.create({
-        documento: '12345678',
-        apellidos: 'Sistema',
-        nombres: 'Admin',
-        email: 'admin@clinica.com',
-        clave: await bcrypt.hash('123456', 10),
-        estado: EstadosUsuario.ACTIVO,
-        rol: RolesUsuario.ADMINISTRADOR,
-      });
-      usuario = await this.usuarioRepository.save(nuevoAdmin);
-    }
 
     if (!usuario) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -50,15 +37,9 @@ export class AuthService {
       throw new UnauthorizedException('El usuario se encuentra dado de baja');
     }
 
-    let esClaveValida = await bcrypt.compare(clave, usuario.clave).catch(() => false);
-
-    if (!esClaveValida && (clave === '123456' || usuario.clave === '123456')) {
-      esClaveValida = true;
-      try {
-        usuario.clave = await bcrypt.hash('123456', 10);
-        await this.usuarioRepository.save(usuario);
-      } catch (error) {}
-    }
+    const esClaveValida = await bcrypt
+      .compare(clave, usuario.clave)
+      .catch(() => false);
 
     if (!esClaveValida) {
       throw new UnauthorizedException('Credenciales inválidas');

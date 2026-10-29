@@ -1,3 +1,4 @@
+
 <div class="container py-4">
   <!-- Encabezado de la Sección -->
   <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
@@ -5,10 +6,26 @@
       <h2 class="h3 fw-bold text-dark mb-1">Mis Turnos Reservados</h2>
       <p class="text-muted small mb-0">Gestioná tus citas médicas activas y pasadas</p>
     </div>
-    <button class="btn btn-primary px-3 shadow-sm d-flex align-items-center gap-2" (click)="router.navigate(['/reservas/nueva'])">
-      <i class="bi bi-plus-lg"></i>
-      <span>+ Solicitar Nuevo Turno</span>
-    </button>
+
+    <!-- Grupo de Botones a la derecha -->
+    <div class="d-flex gap-2">
+      <!-- BOTÓN SOLO VISIBLE PARA ADMINISTRADOR -->
+      <button 
+        *ngIf="esAdmin"
+        class="btn btn-outline-primary px-3 shadow-sm d-flex align-items-center gap-2" 
+        (click)="router.navigate(['/medicos'])">
+        <i class="bi bi-gear-fill"></i>
+        <span>Gestión de Tarifas</span>
+      </button>
+
+      <!-- Botón para solicitar nuevo turno -->
+      <button 
+        class="btn btn-primary px-3 shadow-sm d-flex align-items-center gap-2" 
+        (click)="router.navigate(['/reservas/nueva'])">
+        <i class="bi bi-plus-lg"></i>
+        <span>+ Solicitar Nuevo Turno</span>
+      </button>
+    </div>
   </div>
 
   <!-- Mensajes de Estado (Alertas) -->
@@ -24,45 +41,27 @@
     <div class="spinner-border text-primary mb-3" role="status" style="width: 2.5rem; height: 2.5rem;">
       <span class="visually-hidden">Cargando...</span>
     </div>
-    <p class="text-muted font-monospace mb-0">Cargando tus reservas...</p>
+    <p class="text-muted">Cargando listado de turnos...</p>
   </div>
 
-  <!-- Estado sin reservas (Empty State) -->
-  <div *ngIf="!cargando && reservas.length === 0" class="card border-0 shadow-sm text-center py-5">
-    <div class="card-body">
-      <div class="mb-3 text-muted">
-        <i class="bi bi-calendar-x display-4"></i>
-      </div>
-      <h5 class="fw-bold text-secondary">No tenés turnos programados</h5>
-      <p class="text-muted small mb-3">Cuando solicites una cita médica, va a figurar en esta sección.</p>
-      <button class="btn btn-outline-primary btn-sm" (click)="router.navigate(['/reservas/nueva'])">
-        Reservar mi primer turno
-      </button>
-    </div>
-  </div>
-
-  <!-- Tabla de Reservas -->
-  <div *ngIf="!cargando && reservas.length > 0" class="card border-0 shadow-sm overflow-hidden">
+  <!-- Listado de Reservas -->
+  <div *ngIf="!cargando" class="card border-0 shadow-sm">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
-        <thead class="table-light text-uppercase fs-7 text-muted">
+        <thead class="table-light">
           <tr>
-            <th class="ps-4"># ID</th>
+            <th class="ps-4">#</th>
             <th>Médico</th>
             <th>Fecha y Hora</th>
-            <th>Valor Consulta</th>
+            <th>Tarifa Congelada</th>
             <th>Estado</th>
             <th class="text-end pe-4">Acciones</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let r of reservas">
-            <td class="ps-4 fw-semibold text-secondary">#{{ r.id }}</td>
-            <td>
-              <span class="fw-medium text-dark">
-                {{ r.nombreMedico || ('Médico #' + r.idMedico) }}
-              </span>
-            </td>
+            <td class="ps-4 fw-bold">#{{ r.id }}</td>
+            <td>{{ r.nombreMedico || 'Médico #' + r.idMedico }}</td>
             <td>
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-clock text-muted"></i>
@@ -87,20 +86,20 @@
               </span>
             </td>
             <td class="text-end pe-4">
-            <!-- Si se cumple la condición, muestra el botón. Si NO, salta al #sinAcciones -->
-            <button 
-              *ngIf="(r.estado?.toUpperCase() === 'ACTIVO' || r.estado?.toUpperCase() === 'CONFIRMADA') && puedeCancelarPaciente(r.fechaHora); else sinAcciones" 
-              class="btn btn-outline-danger btn-sm px-3" 
-              (click)="cancelarReserva(r.id)">
-              Cancelar Turno
-            </button>
+              <!-- Si se cumple la condición (Admin o Paciente), muestra el botón. Si NO, salta a #sinAcciones -->
+              <button 
+                *ngIf="(r.estado?.toUpperCase() === 'ACTIVO' || r.estado?.toUpperCase() === 'CONFIRMADA') && puedeCancelar(r.fechaHora); else sinAcciones" 
+                class="btn btn-outline-danger btn-sm px-3" 
+                (click)="cancelarReserva(r.id)">
+                Cancelar Turno
+              </button>
 
-            <!-- Plantilla alternativa cuando no se puede cancelar -->
-            <ng-template #sinAcciones>
-              <span class="text-muted small fst-italic">
-                Sin acciones
-              </span>
-            </ng-template>
+              <!-- Plantilla alternativa cuando no se puede cancelar -->
+              <ng-template #sinAcciones>
+                <span class="text-muted small fst-italic">
+                  Sin acciones
+                </span>
+              </ng-template>
             </td>
           </tr>
         </tbody>
